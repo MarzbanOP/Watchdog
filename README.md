@@ -21,7 +21,7 @@
 
 1. RUN COMMAND 
 ```bash
-sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
+sudo bash -c "$(curl -sL https://github.com/MarzbanOP/Watchdog/raw/master/run.sh)" @ install
 ```
 
 2. Install dependencies:
