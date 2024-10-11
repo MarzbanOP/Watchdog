@@ -138,7 +138,7 @@ while true; do
             else
                 echo -e "${CYAN}Installing...${NC}"  # Use Cyan for install
                 show_loading
-                REPO_URL="https://github.com/mmdzov/ipwatchdog.git"
+                REPO_URL="https://github.com/MarzbanOP/Watchdog.git"
                 PROJECT_DIR="ipwatchdog"
 
                 # Check if Docker is running
