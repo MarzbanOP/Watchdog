@@ -115,13 +115,6 @@ while true; do
     show_menu
     read -r option
 
-    # Reset the first menu flag to show project info again if invalid input is given
-    if [[ -z "$option" ]]; then
-        FIRST_MENU=1
-        echo -e "${RED}No option entered. Please try again.${NC}"
-        continue
-    fi
-
     case $option in
         0)
             echo -e "${GREEN}Exiting...${NC}"
@@ -201,7 +194,11 @@ while true; do
             # Placeholder for monitoring logic, if any specific monitoring actions are needed
             ;;
         *)
-            echo -e "${RED}Invalid option. Please try again.${NC}"
+            if [[ -z "$option" ]]; then
+                echo -e "${RED}No option entered. Please try again.${NC}"
+            else
+                echo -e "${RED}Invalid option. Please try again.${NC}"
+            fi
             FIRST_MENU=1  # Reset flag to show project info again on next loop
             ;;
     esac
