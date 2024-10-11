@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  ipwatchdog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      - redis
+      - sqlite
+      - json
+
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  sqlite:
+    image: nouchka/sqlite3
+    volumes:
+      - ./storage/sqlite:/db
+    restart: unless-stopped
+
+  json:
+    image: "alpine:latest"
+    volumes:
+      - ./storage:/app/storage
+    command: tail -f /dev/null
+    restart: unless-stopped
