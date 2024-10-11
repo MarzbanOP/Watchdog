@@ -52,8 +52,8 @@ function show_menu {
     # Display all options
     if check_docker_status; then
         echo -e "${GREEN} [Running]   Project is currently running.${NC}"
-        echo -e "${MAGENTA}1) Uninstall ${NC}"  # Change color to Magenta for uninstall
-        echo -e "${CYAN}2) Repair ${NC}"     # Change color to Cyan for repair
+        echo -e "${MAGENTA}1) Uninstall ${NC}"
+        echo -e "${CYAN}2) Repair ${NC}"
         echo -e "${GREEN}3) Monitor ${NC}"
     else
         echo -e "${RED} [Stopped]   Project is not running.${NC}"
@@ -66,40 +66,30 @@ function show_menu {
 # Centralized function to handle environment variable configuration
 function configure_env {
     echo -e "${YELLOW}Please enter the following details for the .env file (press Enter to use default):${NC}"
+    
+    # Function to read input with default values
+    function read_input {
+        local prompt="$1"
+        local default_value="$2"
+        read -p "$(echo -e "${BLUE}$prompt (default: $default_value): ${NC}")" input
+        echo "${input:-$default_value}"
+    }
 
-    read -p "$(echo -e "${BLUE}ADDRESS (default: example.com): ${NC}")" ADDRESS
-    ADDRESS=${ADDRESS:-example.com}
-
-    read -p "$(echo -e "${BLUE}PORT_ADDRESS (default: 443): ${NC}")" PORT_ADDRESS
-    PORT_ADDRESS=${PORT_ADDRESS:-443}
-
-    read -p "$(echo -e "${BLUE}SSL (true/false, default: true): ${NC}")" SSL
-    SSL=${SSL:-true}
-
-    read -p "$(echo -e "${BLUE}P_USER (default: admin): ${NC}")" P_USER
-    P_USER=${P_USER:-admin}
-
-    read -p "$(echo -e "${BLUE}P_PASS (default: admin): ${NC}")" P_PASS
-    P_PASS=${P_PASS:-admin}
-
-    read -p "$(echo -e "${BLUE}MAX_ALLOW_USERS (default: 1): ${NC}")" MAX_ALLOW_USERS
-    MAX_ALLOW_USERS=${MAX_ALLOW_USERS:-1}
-
-    read -p "$(echo -e "${BLUE}BAN_TIME (in minutes, default: 5): ${NC}")" BAN_TIME
-    BAN_TIME=${BAN_TIME:-5}
-
-    read -p "$(echo -e "${BLUE}TG_ENABLE (true/false, default: false): ${NC}")" TG_ENABLE
-    TG_ENABLE=${TG_ENABLE:-false}
+    ADDRESS=$(read_input "ADDRESS" "example.com")
+    PORT_ADDRESS=$(read_input "PORT_ADDRESS" "443")
+    SSL=$(read_input "SSL (true/false)" "true")
+    P_USER=$(read_input "P_USER" "admin")
+    P_PASS=$(read_input "P_PASS" "admin")
+    MAX_ALLOW_USERS=$(read_input "MAX_ALLOW_USERS" "1")
+    BAN_TIME=$(read_input "BAN_TIME (in minutes)" "5")
+    TG_ENABLE=$(read_input "TG_ENABLE (true/false)" "false")
 
     if [[ "$TG_ENABLE" == "true" ]]; then
-        read -p "$(echo -e "${BLUE}TG_TOKEN (default: your-telegram-bot-token): ${NC}")" TG_TOKEN
-        TG_TOKEN=${TG_TOKEN:-your-telegram-bot-token}
-
-        read -p "$(echo -e "${BLUE}TG_ADMIN (default: your-telegram-admin-id): ${NC}")" TG_ADMIN
-        TG_ADMIN=${TG_ADMIN:-your-telegram-admin-id}
+        TG_TOKEN=$(read_input "TG_TOKEN" "your-telegram-bot-token")
+        TG_ADMIN=$(read_input "TG_ADMIN" "your-telegram-admin-id")
     else
-        TG_TOKEN="your-telegram-bot-token"  # Default if TG_ENABLE is false
-        TG_ADMIN="your-telegram-admin-id"    # Default if TG_ENABLE is false
+        TG_TOKEN="your-telegram-bot-token"
+        TG_ADMIN="your-telegram-admin-id"
     fi
 
     # Create or append to the .env file
@@ -114,7 +104,7 @@ function configure_env {
         echo "TG_ENABLE=$TG_ENABLE"
         echo "TG_TOKEN=$TG_TOKEN"
         echo "TG_ADMIN=$TG_ADMIN"
-    } >> .env
+    } > .env
 }
 
 # Initialize a flag to track the first menu display
@@ -132,11 +122,11 @@ while true; do
             ;;
         1)
             if check_docker_status; then
-                echo -e "${MAGENTA}Uninstalling...${NC}"  # Use Magenta for uninstall
+                echo -e "${MAGENTA}Uninstalling...${NC}"
                 docker-compose down
                 echo -e "${GREEN}Uninstallation complete.${NC}"
             else
-                echo -e "${CYAN}Installing...${NC}"  # Use Cyan for install
+                echo -e "${CYAN}Installing...${NC}"
                 show_loading
                 REPO_URL="https://github.com/MarzbanOP/Watchdog.git"
                 PROJECT_DIR="ipwatchdog"
@@ -178,6 +168,7 @@ while true; do
                 echo
                 read -p "Enter option (1-3): " storage_option
 
+                # Validate storage option
                 case $storage_option in
                     1) echo "STORAGE_TYPE=redis" > .env ;;
                     2) echo "STORAGE_TYPE=sqlite" > .env ;;
@@ -194,12 +185,12 @@ while true; do
             fi
             ;;
         2)
-            echo -e "${CYAN}Repairing...${NC}"  # Use Cyan for repair
+            echo -e "${CYAN}Repairing...${NC}"  
             # Placeholder for repair logic, if any specific repairs are needed
             echo -e "${GREEN}Repair completed!${NC}"
             ;;
         3)
-            echo -e "${YELLOW}Monitoring...${NC}"  # Use Yellow for monitor
+            echo -e "${YELLOW}Monitoring...${NC}"  
             # Placeholder for monitoring logic, if any specific monitoring actions are needed
             ;;
         *)
