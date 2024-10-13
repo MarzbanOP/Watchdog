@@ -42,9 +42,6 @@ function check_docker_status {
 function show_menu {
     clear
     echo -e "${BLUE}--- Watchdog Menu ---${NC}"
-    echo -e "${YELLOW}This menu allows you to manage the Watchdog project.${NC}"
-    echo -e "${YELLOW}Use arrow keys to navigate and select options.${NC}"  # Indicate arrow key support
-
     # Display project information on the first menu
     if [[ $FIRST_MENU -eq 1 ]]; then
         show_project_info
