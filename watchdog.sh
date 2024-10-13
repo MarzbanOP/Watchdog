@@ -134,7 +134,7 @@ while true; do
                 echo -e "${CYAN}Installing...${NC}"
                 show_loading
                 REPO_URL="https://github.com/MarzbanOP/Watchdog.git"
-                PROJECT_DIR="watchdog"
+                PROJECT_DIR="Watchdog"
 
                 # Check if Docker is running
                 if ! systemctl is-active --quiet docker; then
