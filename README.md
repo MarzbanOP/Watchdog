@@ -1,5 +1,3 @@
-
-
 # 🐶 Watchdog
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-alpha%200.0.1-blue) ![License](https://img.shields.io/badge/license-MIT-yellowgreen) ![GitHub Stars](https://img.shields.io/github/stars/MarzbanOP/Watchdog?style=social) ![GitHub Forks](https://img.shields.io/github/forks/MarzbanOP/Watchdog?style=social)
