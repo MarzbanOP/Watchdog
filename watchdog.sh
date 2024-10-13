@@ -1,26 +1,18 @@
 #!/bin/bash
 
 # Color codes
-RED='\033[0;31m'       # Red
-GREEN='\033[0;32m'     # Green
-YELLOW='\033[0;33m'    # Yellow
-BLUE='\033[0;34m'      # Blue
-CYAN='\033[0;36m'      # Cyan
-MAGENTA='\033[0;35m'   # Magenta
-NC='\033[0m'           # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'  # No Color
 
-# Function to show loading effect
-function show_loading {
-    echo -e "${BLUE}Loading${NC}"
-    for i in {1..3}; do
-        sleep 0.5
-        echo -n "."
-    done
-    echo ""
-}
+# Array of menu options
+options=()
 
 # Function to display project information
-function show_project_info {
+show_project_info() {
     echo -e "${GREEN}Welcome to the watchdog project!${NC}"
     echo -e "${YELLOW}This project is designed to monitor and manage proxy usage effectively.${NC}"
     echo -e "${YELLOW}It includes features such as user banning, logging, and Telegram notifications.${NC}"
@@ -30,7 +22,7 @@ function show_project_info {
 }
 
 # Function to check if Docker containers are running
-function check_docker_status {
+check_docker_status() {
     if [[ $(docker ps --filter "name=watchdog" --format '{{.Names}}') == "watchdog" ]]; then
         return 0  # Running
     else
@@ -38,17 +30,11 @@ function check_docker_status {
     fi
 }
 
-# Function to display the main menu
-function show_menu {
+# Function to display the menu
+show_menu() {
     clear
     echo -e "${BLUE}--- Watchdog Menu ---${NC}"
-    # Display project information on the first menu
-    if [[ $FIRST_MENU -eq 1 ]]; then
-        show_project_info
-        FIRST_MENU=0  # Set the flag to 0 after displaying info
-    fi
     
-    # Display all options with highlighting
     if check_docker_status; then
         echo -e "${GREEN} [Running]   Project is currently running.${NC}"
         options=("Uninstall" "Repair" "Monitor" "Exit")
@@ -57,15 +43,70 @@ function show_menu {
         options=("Install" "Exit")
     fi
 
-    # Display options
     for i in "${!options[@]}"; do
-        if [[ $i -eq $selected_option ]]; then
-            echo -e "${CYAN}> ${options[i]} ${NC}"  # Highlight selected option
+        if [[ $i -eq $selected ]]; then
+            echo -e "${CYAN}> ${options[$i]} ${NC}"
         else
-            echo -e "  ${options[i]}"
+            echo -e "  ${options[$i]}"
         fi
     done
 }
+
+# Function to handle menu actions
+handle_action() {
+    case ${options[$selected]} in
+        "Uninstall")
+            echo -e "${YELLOW}Uninstalling...${NC}"
+            docker-compose down
+            echo -e "${GREEN}Uninstallation complete.${NC}"
+            ;;
+        "Repair")
+            echo -e "${YELLOW}Repairing...${NC}"
+            echo -e "${GREEN}Repair completed!${NC}"
+            ;;
+        "Monitor")
+            echo -e "${YELLOW}Monitoring...${NC}"
+            # Add monitoring logic here
+            ;;
+        "Install")
+            echo -e "${YELLOW}Installing...${NC}"
+            # Add installation logic here
+            ;;
+        "Exit")
+            echo -e "${GREEN}Exiting...${NC}"
+            exit 0
+            ;;
+    esac
+    read -n 1 -s -r -p "Press any key to continue..."
+}
+
+# Initialize selection
+selected=0
+
+# Show project info at the start
+show_project_info
+
+# Main loop
+while true; do
+    show_menu
+
+    # Read a single character without requiring Enter
+    read -s -n 1 key
+
+    # Handle the arrow keys
+    if [[ $key == $'\e' ]]; then
+        read -s -n 2 key
+        if [[ $key == '[A' ]]; then  # Up arrow
+            ((selected--))
+            [[ $selected -lt 0 ]] && selected=$((${#options[@]} - 1))
+        elif [[ $key == '[B' ]]; then  # Down arrow
+            ((selected++))
+            [[ $selected -ge ${#options[@]} ]] && selected=0
+        fi
+    elif [[ $key == '' ]]; then  # Enter key
+        handle_action
+    fi
+done
 
 # Centralized function to handle environment variable configuration
 function configure_env {
