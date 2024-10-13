@@ -71,9 +71,9 @@ During the installation, you’ll be prompted to configure the `.env` file. Here
 Here’s a quick look at what your `.env` file might look like:
 
 ```bash
-ADDRESS=example.com
-PORT_ADDRESS=443
-SSL=true
+ADDRESS=127.0.0.1
+PORT_ADDRESS=8000
+SSL=false
 P_USER=admin
 P_PASS=admin
 MAX_ALLOW_USERS=1

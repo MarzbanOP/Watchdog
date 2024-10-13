@@ -3,21 +3,24 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"github.com/go-redis/redis/v8"
-	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 	"watchdog/models"
+
+	"github.com/go-redis/redis/v8"
+	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
+
 
 var (
-	ctx = context.Background()
-	rdb *redis.Client
-	mu  sync.Mutex // Mutex for JSON file operations
+	ctx                = context.Background()
+	rdb                *redis.Client
+	mu                 sync.Mutex // Mutex for JSON file operations
+	userDeleteDelay, _ = strconv.Atoi(os.Getenv("USER_DELETE_DELAY")) // Read from .env
 )
-
 // Initialize Redis client
 func InitRedis() {
 	rdb = redis.NewClient(&redis.Options{
@@ -44,10 +47,14 @@ func AddUserRedis(c *fiber.Ctx) error {
 		return c.Status(500).SendString("Failed to add user to Redis")
 	}
 
+	// Schedule user deletion after USER_DELETE_DELAY seconds
+	go deleteUserAfterDuration(c,user.Email, "redis")
+
 	return c.Status(201).JSON(user)
 }
 
 // DeleteUserRedis - Handler to delete user in Redis
+
 func DeleteUserRedis(c *fiber.Ctx) error {
 	email := c.Params("email")
 
@@ -55,7 +62,6 @@ func DeleteUserRedis(c *fiber.Ctx) error {
 	if err := rdb.Del(ctx, email).Err(); err != nil {
 		return c.Status(500).SendString("Failed to delete user from Redis")
 	}
-
 	return c.Status(204).SendString("")
 }
 
@@ -92,6 +98,9 @@ func AddUserJSON(c *fiber.Ctx) error {
 	if err := os.WriteFile("storage/users.json", updatedData, 0644); err != nil {
 		return c.Status(500).SendString("Failed to write updated users")
 	}
+
+	// Schedule user deletion after USER_DELETE_DELAY seconds
+	go deleteUserAfterDuration(c,newUser.Email, "json")
 
 	return c.Status(201).JSON(newUser)
 }
@@ -146,6 +155,9 @@ func AddUserSQLite(c *fiber.Ctx, db *gorm.DB) error {
 		return c.Status(500).SendString("Failed to add user to SQLite")
 	}
 
+	// Schedule user deletion after USER_DELETE_DELAY seconds
+	go deleteUserAfterDuration(c,newUser.Email, "sqlite")
+
 	return c.Status(201).JSON(newUser)
 }
 
@@ -159,6 +171,25 @@ func DeleteUserSQLite(c *fiber.Ctx, db *gorm.DB) error {
 
 	return c.Status(204).SendString("")
 }
+
+
+// deleteUserAfterDuration deletes the user after a specified duration
+func deleteUserAfterDuration(c *fiber.Ctx, email, storageType string) {
+	time.Sleep(time.Duration(userDeleteDelay) * time.Second)
+
+	// Call the appropriate delete function based on storage type
+	switch storageType {
+	case "redis":
+		_ = DeleteUserRedis(c) // Error ignored for simplicity
+
+	case "json":
+		_ = DeleteUserJSON(c) // Error ignored for simplicity
+
+	case "sqlite":
+		_ = DeleteUserSQLite(c, nil) // Ensure to pass a valid db instance
+	}
+}
+
 
 // BlockIPRedis - Handler to block an IP in Redis
 func BlockIPRedis(c *fiber.Ctx) error {
@@ -292,3 +323,5 @@ func UnblockIPSQLite(c *fiber.Ctx, db *gorm.DB) error {
 
 	return c.Status(200).SendString("IP unblocked successfully")
 }
+
+

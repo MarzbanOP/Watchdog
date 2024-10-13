@@ -83,6 +83,7 @@ function configure_env {
     MAX_ALLOW_USERS=$(read_input "MAX_ALLOW_USERS" "1")
     BAN_TIME=$(read_input "BAN_TIME (in minutes)" "5")
     WHITELIST_ADDRESSES=$(read_input "WHITELIST_ADDRESSES (comma-separated)" "127.0.0.1")
+    USER_DELETE_DELAY=$(read_input "USER_DELETE_DELAY (in seconds)" "30")
 
     TG_ENABLE=$(read_input "TG_ENABLE (true/false)" "false")
 
@@ -103,6 +104,7 @@ function configure_env {
         echo "P_PASS=$P_PASS"
         echo "MAX_ALLOW_USERS=$MAX_ALLOW_USERS"
         echo "BAN_TIME=$BAN_TIME"
+        echo "USER_DELETE_DELAY=$USER_DELETE_DELAY"  # New variable added
         echo "TG_ENABLE=$TG_ENABLE"
         echo "TG_TOKEN=$TG_TOKEN"
         echo "TG_ADMIN=$TG_ADMIN"
@@ -143,11 +145,11 @@ while true; do
                 # Check if the project directory already exists
                 if [ ! -d "$PROJECT_DIR" ]; then
                     echo -e "${BLUE}Cloning the repository...${NC}"
-                    git clone "$REPO_URL" || { echo -e "${RED}Failed to clone repository.${NC}"; exit 1; }
+                    git clone "$REPO_URL"
                 else
                     echo -e "${BLUE}Repository already exists. Pulling the latest changes...${NC}"
                     cd "$PROJECT_DIR" || exit
-                    git pull || { echo -e "${RED}Failed to pull latest changes.${NC}"; exit 1; }
+                    git pull
                     cd .. || exit
                 fi
 

@@ -21,14 +21,6 @@ func GetToken() (string, error) {
     address := os.Getenv("ADDRESS")
     port := os.Getenv("PORT_ADDRESS")
 
-    // Set default values
-    if address == "" {
-        address = "127.0.0.1" // Default address
-    }
-    if port == "" {
-        port = "8000" // Default port
-    }
-
     // Construct the token URL
     tokenURL := fmt.Sprintf("http://%s:%s/api/admin/token", address, port)
 
