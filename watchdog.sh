@@ -40,6 +40,7 @@ function check_docker_status {
 
 # Function to display the main menu
 function show_menu {
+    clear
     echo -e "${BLUE}--- Watchdog Menu ---${NC}"
     echo -e "${YELLOW}This menu allows you to manage the Watchdog project.${NC}"
     echo -e "${YELLOW}Use arrow keys to navigate and select options.${NC}"  # Indicate arrow key support
@@ -50,18 +51,23 @@ function show_menu {
         FIRST_MENU=0  # Set the flag to 0 after displaying info
     fi
     
-    # Display all options
+    # Display all options with highlighting
     if check_docker_status; then
         echo -e "${GREEN} [Running]   Project is currently running.${NC}"
-        echo -e "${MAGENTA}1) Uninstall ${NC}"
-        echo -e "${CYAN}2) Repair ${NC}"
-        echo -e "${GREEN}3) Monitor ${NC}"
+        options=("Uninstall" "Repair" "Monitor" "Exit")
     else
         echo -e "${RED} [Stopped]   Project is not running.${NC}"
-        echo -e "${GREEN}1) Install ${NC}"
+        options=("Install" "Exit")
     fi
-    echo -e "${RED}0) Exit ${NC}"
-    echo -n "Please choose an option: "
+
+    # Display options
+    for i in "${!options[@]}"; do
+        if [[ $i -eq $selected_option ]]; then
+            echo -e "${CYAN}> ${options[i]} ${NC}"  # Highlight selected option
+        else
+            echo -e "  ${options[i]}"
+        fi
+    done
 }
 
 # Centralized function to handle environment variable configuration
@@ -115,32 +121,47 @@ function configure_env {
 
 # Initialize a flag to track the first menu display
 FIRST_MENU=1
+selected_option=0  # Start at the first option
 
 # Main menu loop
 while true; do
     show_menu
 
     # Read single character input (including arrow keys)
-    read -rsn1 option
-    if [[ $option == $'\e' ]]; then
-        read -rsn2 option # read the two characters after escape
-        case "$option" in
-            '[A') option=3 ;; # Up arrow
-            '[B') option=1 ;; # Down arrow
+    read -rsn1 input
+    if [[ $input == $'\e' ]]; then
+        read -rsn2 input # read the two characters after escape
+        case "$input" in
+            '[A')  # Up arrow
+                ((selected_option--))
+                if [[ $selected_option -lt 0 ]]; then
+                    selected_option=0
+                fi
+                ;;
+            '[B')  # Down arrow
+                ((selected_option++))
+                if [[ $selected_option -gt $((${#options[@]} - 1)) ]]; then
+                    selected_option=$((${#options[@]} - 1))
+                fi
+                ;;
         esac
-    fi
-
-    case $option in
-        0)
-            echo -e "${GREEN}Exiting...${NC}"
-            exit 0
-            ;;
-        1)
-            if check_docker_status; then
+    elif [[ $input == $'\n' ]]; then
+        case ${options[selected_option]} in
+            "Uninstall")
                 echo -e "${MAGENTA}Uninstalling...${NC}"
                 docker-compose down
                 echo -e "${GREEN}Uninstallation complete.${NC}"
-            else
+                ;;
+            "Repair")
+                echo -e "${CYAN}Repairing...${NC}"  
+                # Placeholder for repair logic, if any specific repairs are needed
+                echo -e "${GREEN}Repair completed!${NC}"
+                ;;
+            "Monitor")
+                echo -e "${YELLOW}Monitoring...${NC}"  
+                # Placeholder for monitoring logic, if any specific monitoring actions are needed
+                ;;
+            "Install")
                 echo -e "${CYAN}Installing...${NC}"
                 show_loading
                 REPO_URL="https://github.com/MarzbanOP/Watchdog.git"
@@ -196,24 +217,11 @@ while true; do
                 # Start Docker Compose
                 echo -e "${BLUE}Starting watchdog...${NC}"
                 docker-compose up --build || { echo -e "${RED}Failed to start Docker compose.${NC}"; exit 1; }
-            fi
-            ;;
-        2)
-            echo -e "${CYAN}Repairing...${NC}"  
-            # Placeholder for repair logic, if any specific repairs are needed
-            echo -e "${GREEN}Repair completed!${NC}"
-            ;;
-        3)
-            echo -e "${YELLOW}Monitoring...${NC}"  
-            # Placeholder for monitoring logic, if any specific monitoring actions are needed
-            ;;
-        *)
-            if [[ -z "$option" ]]; then
-                echo -e "${RED}No option entered. Please try again.${NC}"
-            else
-                echo -e "${RED}Invalid option. Please try again.${NC}"
-            fi
-            FIRST_MENU=1  # Reset flag to show project info again on next loop
-            ;;
-    esac
+                ;;
+            "Exit")
+                echo -e "${GREEN}Exiting...${NC}"
+                exit 0
+                ;;
+        esac
+    fi
 done
