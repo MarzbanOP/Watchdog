@@ -1,6 +1,8 @@
+
+
 # 🐶 Watchdog
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-MIT-yellowgreen)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![Version](https://img.shields.io/badge/version-alpha%200.0.1-blue) ![License](https://img.shields.io/badge/license-MIT-yellowgreen) ![GitHub Stars](https://img.shields.io/github/stars/MarzbanOP/Watchdog?style=social) ![GitHub Forks](https://img.shields.io/github/forks/MarzbanOP/Watchdog?style=social)
 
 Welcome to **Watchdog**, your go-to tool for monitoring and managing proxy usage effectively! Built with Go, Watchdog helps you limit IP connections and block suspicious activity using `iptables` in **Marzban**. With easy JSON configuration and a user-friendly API, managing users and automating controls has never been simpler!
 
