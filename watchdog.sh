@@ -143,15 +143,14 @@ while true; do
                 fi
 
                 # Check if the project directory already exists
-                if [ ! -d "$PROJECT_DIR" ]; then
-                    echo -e "${BLUE}Cloning the repository...${NC}"
-                    git clone "$REPO_URL"
-                else
-                    echo -e "${BLUE}Repository already exists. Pulling the latest changes...${NC}"
-                    cd "$PROJECT_DIR" || exit
-                    git pull
-                    cd .. || exit
+                if [ -d "$PROJECT_DIR" ]; then
+                    echo -e "${RED}Directory '$PROJECT_DIR' already exists. Deleting it...${NC}"
+                    rm -rf "$PROJECT_DIR"
                 fi
+
+                # Clone the repository
+                echo -e "${BLUE}Cloning the repository...${NC}"
+                git clone "$REPO_URL"
 
                 # Navigate to the project directory
                 cd "$PROJECT_DIR" || exit
