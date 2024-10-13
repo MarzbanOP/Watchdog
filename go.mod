@@ -1,10 +1,11 @@
-module ipwatchdog
+module watchdog
 
 go 1.23.1
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gofiber/fiber/v2 v2.52.5
+	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
 	gorm.io/gorm v1.25.12
 )

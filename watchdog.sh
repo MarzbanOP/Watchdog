@@ -21,7 +21,7 @@ function show_loading {
 
 # Function to display project information
 function show_project_info {
-    echo -e "${GREEN}Welcome to the IPWatchdog project!${NC}"
+    echo -e "${GREEN}Welcome to the watchdog project!${NC}"
     echo -e "${YELLOW}This project is designed to monitor and manage proxy usage effectively.${NC}"
     echo -e "${YELLOW}It includes features such as user banning, logging, and Telegram notifications.${NC}"
     echo -e "${YELLOW}You can choose different storage options: Redis, SQLite, or JSON for data management.${NC}"
@@ -31,7 +31,7 @@ function show_project_info {
 
 # Function to check if Docker containers are running
 function check_docker_status {
-    if [[ $(docker ps --filter "name=ipwatchdog" --format '{{.Names}}') == "ipwatchdog" ]]; then
+    if [[ $(docker ps --filter "name=watchdog" --format '{{.Names}}') == "watchdog" ]]; then
         return 0  # Running
     else
         return 1  # Not running
@@ -40,8 +40,8 @@ function check_docker_status {
 
 # Function to display the main menu
 function show_menu {
-    echo -e "${BLUE}--- IPWatchdog Menu ---${NC}"
-    echo -e "${YELLOW}This menu allows you to manage the IPWatchdog project.${NC}"
+    echo -e "${BLUE}--- Watchdog Menu ---${NC}"
+    echo -e "${YELLOW}This menu allows you to manage the Watchdog project.${NC}"
     
     # Display project information on the first menu
     if [[ $FIRST_MENU -eq 1 ]]; then
@@ -82,6 +82,8 @@ function configure_env {
     P_PASS=$(read_input "P_PASS" "admin")
     MAX_ALLOW_USERS=$(read_input "MAX_ALLOW_USERS" "1")
     BAN_TIME=$(read_input "BAN_TIME (in minutes)" "5")
+    WHITELIST_ADDRESSES=$(read_input "WHITELIST_ADDRESSES (comma-separated)" "127.0.0.1")
+
     TG_ENABLE=$(read_input "TG_ENABLE (true/false)" "false")
 
     if [[ "$TG_ENABLE" == "true" ]]; then
@@ -104,6 +106,7 @@ function configure_env {
         echo "TG_ENABLE=$TG_ENABLE"
         echo "TG_TOKEN=$TG_TOKEN"
         echo "TG_ADMIN=$TG_ADMIN"
+        echo "WHITELIST_ADDRESSES=$WHITELIST_ADDRESSES"
     } > .env
 }
 
@@ -129,7 +132,7 @@ while true; do
                 echo -e "${CYAN}Installing...${NC}"
                 show_loading
                 REPO_URL="https://github.com/MarzbanOP/Watchdog.git"
-                PROJECT_DIR="ipwatchdog"
+                PROJECT_DIR="watchdog"
 
                 # Check if Docker is running
                 if ! systemctl is-active --quiet docker; then
@@ -140,11 +143,11 @@ while true; do
                 # Check if the project directory already exists
                 if [ ! -d "$PROJECT_DIR" ]; then
                     echo -e "${BLUE}Cloning the repository...${NC}"
-                    git clone "$REPO_URL"
+                    git clone "$REPO_URL" || { echo -e "${RED}Failed to clone repository.${NC}"; exit 1; }
                 else
                     echo -e "${BLUE}Repository already exists. Pulling the latest changes...${NC}"
                     cd "$PROJECT_DIR" || exit
-                    git pull
+                    git pull || { echo -e "${RED}Failed to pull latest changes.${NC}"; exit 1; }
                     cd .. || exit
                 fi
 
@@ -180,8 +183,8 @@ while true; do
                 configure_env
 
                 # Start Docker Compose
-                echo -e "${BLUE}Starting IPWatchdog...${NC}"
-                docker-compose up --build
+                echo -e "${BLUE}Starting watchdog...${NC}"
+                docker-compose up --build || { echo -e "${RED}Failed to start Docker compose.${NC}"; exit 1; }
             fi
             ;;
         2)
