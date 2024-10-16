@@ -29,7 +29,7 @@ Before diving in, make sure you have the following installed:
 Getting started with Watchdog is super easy! Just run the command below to install it:
 
 ```bash
-sudo bash -c "$(curl -sL https://raw.githubusercontent.com/MarzbanOP/Watchdog/refs/heads/main/watchdog.sh)" @ install
+sudo bash -c "$(curl -sL https://raw.githubusercontent.com/MarzbanOP/Watchdog/refs/heads/main/watchdog.sh)"
 ```
 
 Once installed, navigate to the project directory and access the menu:
