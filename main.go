@@ -14,7 +14,7 @@ import (
 )
 
 // checkAndDeleteUsers checks users in the JSON file and deletes them if necessary
-func checkAndDeleteUsers(queue chan<- string) {
+func checkUsers(queue chan<- string) {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -36,8 +36,48 @@ func checkAndDeleteUsers(queue chan<- string) {
             queue <- user.Email
             fmt.Printf("User %s is scheduled for deletion\n", user.Email)
 
+			storageType := os.Getenv("STORAGE_TYPE")
+			if storageType == "" {
+				log.Fatal("STORAGE_TYPE environment variable is not set")
+			}
+			switch storageType {
+			case "redis":
+				handlers.DeleteUserRedis(user.Email)
+			case "json":
+				handlers.DeleteUserJSON(user.Email)
+			case "sqlite":
+				handlers.DeleteUserSQLite(user.Email)
+			default:
+				log.Fatal("Invalid STORAGE_TYPE specified. Must be 'redis', 'json', or 'sqlite'.")
+			}
             // Here, implement removal logic from the JSON file if necessary
         }
+    }
+}
+
+func checkActiveIPs() {
+    err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+    limit, _ := strconv.Atoi(os.Getenv("MAX_ALLOW_USERS"))
+
+    users, err := handlers.GetAllUserJSON()
+    if err != nil {
+        fmt.Println("Error retrieving users:", err)
+        return
+    }
+
+    totalActiveIPs := 0
+    for _, user := range users {
+        totalActiveIPs += len(user.ActiveIPs)
+    }
+
+    if totalActiveIPs >= limit {
+        fmt.Printf("Fuck, we've run out of IPs! Current count: %d, limit: %d\n", totalActiveIPs, limit)
+    } else {
+        fmt.Printf("Active IPs are within limit. Current count: %d, limit: %d\n", totalActiveIPs, limit)
     }
 }
 
@@ -76,7 +116,8 @@ func main() {
 	// Start a goroutine to handle user deletions
 	go func() {
 		for {
-			checkAndDeleteUsers(queue) // Call the function that checks for user deletions
+			checkUsers(queue) // Call the function that checks for user deletions
+			checkActiveIPs() 
 			time.Sleep(time.Duration(sleepDuration) * time.Second) // Sleep
 		}
 	}()

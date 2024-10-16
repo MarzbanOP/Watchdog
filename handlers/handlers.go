@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 	"watchdog/models"
@@ -112,13 +113,21 @@ func AddUserRedis(user *models.User, newIP string) error {
 		return fmt.Errorf("failed to serialize user: %v", err)
 	}
 
-	// Store serialized user data in Redis
-	if err := rdb.Set(ctx, user.Email, userData, 0).Err(); err != nil {
+	// Get the expiration time from the environment variable
+	expirationStr := os.Getenv("EXPIRATION_TIME")
+	expiration, err := strconv.Atoi(expirationStr)
+	if err != nil {
+		return fmt.Errorf("failed to convert expiration time: %v", err)
+	}
+
+	// Store serialized user data in Redis with a TTL
+	if err := rdb.SetEX(ctx, user.Email, userData, time.Duration(expiration)*time.Second).Err(); err != nil {
 		return fmt.Errorf("failed to add/update user in Redis: %v", err)
 	}
 
 	return nil
 }
+
 
 // AddUserJSON adds a user to the JSON file and manages their IPs
 func AddUserJSON(newUser *models.User, newIP string) error {
@@ -216,4 +225,53 @@ func AddUserSQLite(newUser *models.User, newIP string) error {
 	}
 
 	return nil
+}
+
+func DeleteUserRedis(email string) error {
+	// Delete user from Redis
+	if err := rdb.Del(ctx, email).Err(); err != nil {
+		return fmt.Errorf("failed to delete user from Redis: %v", err)
+	}
+	return nil
+}
+
+func DeleteUserJSON(email string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Read current users from users.json
+	data, err := os.ReadFile("storage/users.json")
+	if err != nil {
+		return fmt.Errorf("failed to read users: %v", err)
+	}
+
+	var users []models.User
+	if err := json.Unmarshal(data, &users); err != nil {
+		return fmt.Errorf("failed to parse users JSON: %v", err)
+	}
+
+	// Find and delete the user
+	for i, user := range users {
+		if user.Email == email {
+			users = append(users[:i], users[i+1:]...) // Remove user
+			break
+		}
+	}
+
+	// Write updated data back to file
+	updatedData, err := json.Marshal(users)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated users: %v", err)
+	}
+
+	if err := os.WriteFile("storage/users.json", updatedData, 0644); err != nil {
+		return fmt.Errorf("failed to write updated users: %v", err)
+	}
+
+	return nil
+}
+
+// DeleteUserSQLite deletes a user from the SQLite database
+func DeleteUserSQLite(email string) {
+	db.Where("email = ?", email).Delete(&models.User{})
 }
