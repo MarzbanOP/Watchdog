@@ -42,12 +42,15 @@ function check_docker_status {
 function show_menu {
     clear
     echo -e "${BLUE}--- Watchdog Menu ---${NC}"
+    echo -e "${YELLOW}This menu allows you to manage the Watchdog project.${NC}"
+    echo -e "${YELLOW}Use arrow keys to navigate and press Enter to select an option.${NC}"
+
     # Display project information on the first menu
     if [[ $FIRST_MENU -eq 1 ]]; then
         show_project_info
         FIRST_MENU=0  # Set the flag to 0 after displaying info
     fi
-    
+
     # Display all options with highlighting
     if check_docker_status; then
         echo -e "${GREEN} [Running]   Project is currently running.${NC}"
@@ -108,7 +111,7 @@ function configure_env {
         echo "P_PASS=$P_PASS"
         echo "MAX_ALLOW_USERS=$MAX_ALLOW_USERS"
         echo "BAN_TIME=$BAN_TIME"
-        echo "USER_DELETE_DELAY=$USER_DELETE_DELAY"  # New variable added
+        echo "USER_DELETE_DELAY=$USER_DELETE_DELAY"
         echo "TG_ENABLE=$TG_ENABLE"
         echo "TG_TOKEN=$TG_TOKEN"
         echo "TG_ADMIN=$TG_ADMIN"
@@ -137,88 +140,92 @@ while true; do
                 ;;
             '[B')  # Down arrow
                 ((selected_option++))
-                if [[ $selected_option -gt $((${#options[@]} - 1)) ]]; then
+                if [[ $selected_option -ge ${#options[@]} ]]; then
                     selected_option=$((${#options[@]} - 1))
                 fi
                 ;;
         esac
     elif [[ $input == $'\n' ]]; then
-        case ${options[selected_option]} in
-            "Uninstall")
-                echo -e "${MAGENTA}Uninstalling...${NC}"
-                docker-compose down
-                echo -e "${GREEN}Uninstallation complete.${NC}"
-                ;;
-            "Repair")
-                echo -e "${CYAN}Repairing...${NC}"  
-                # Placeholder for repair logic, if any specific repairs are needed
-                echo -e "${GREEN}Repair completed!${NC}"
-                ;;
-            "Monitor")
-                echo -e "${YELLOW}Monitoring...${NC}"  
-                # Placeholder for monitoring logic, if any specific monitoring actions are needed
-                ;;
-            "Install")
-                echo -e "${CYAN}Installing...${NC}"
-                show_loading
-                REPO_URL="https://github.com/MarzbanOP/Watchdog.git"
-                PROJECT_DIR="Watchdog"
+        # Check if Enter is pressed without a valid selection
+        if [[ ${options[selected_option]} ]]; then
+            # Check the selected option and execute the corresponding action
+            case ${options[selected_option]} in
+                "Uninstall")
+                    echo -e "${MAGENTA}Uninstalling...${NC}"
+                    docker-compose down
+                    echo -e "${GREEN}Uninstallation complete.${NC}"
+                    ;;
+                "Repair")
+                    echo -e "${CYAN}Repairing...${NC}"  
+                    # Placeholder for repair logic, if any specific repairs are needed
+                    echo -e "${GREEN}Repair completed!${NC}"
+                    ;;
+                "Monitor")
+                    echo -e "${YELLOW}Monitoring...${NC}"  
+                    # Placeholder for monitoring logic, if any specific monitoring actions are needed
+                    ;;
+                "Install")
+                    echo -e "${CYAN}Installing...${NC}"
+                    show_loading
+                    REPO_URL="https://github.com/MarzbanOP/Watchdog.git"
+                    PROJECT_DIR="Watchdog"
 
-                # Check if Docker is running
-                if ! systemctl is-active --quiet docker; then
-                    echo -e "${RED}Docker is not running. Please start Docker first.${NC}"
-                    exit 1
-                fi
+                    # Check if Docker is running
+                    if ! systemctl is-active --quiet docker; then
+                        echo -e "${RED}Docker is not running. Please start Docker first.${NC}"
+                        exit 1
+                    fi
 
-                # Check if the project directory already exists
-                if [ -d "$PROJECT_DIR" ]; then
-                    echo -e "${RED}Directory '$PROJECT_DIR' already exists. Deleting it...${NC}"
-                    rm -rf "$PROJECT_DIR"
-                fi
+                    # Check if the project directory already exists
+                    if [ -d "$PROJECT_DIR" ]; then
+                        echo -e "${RED}Directory '$PROJECT_DIR' already exists. Deleting it...${NC}"
+                        rm -rf "$PROJECT_DIR"
+                    fi
 
-                # Clone the repository
-                echo -e "${BLUE}Cloning the repository...${NC}"
-                git clone "$REPO_URL"
+                    # Clone the repository
+                    echo -e "${BLUE}Cloning the repository...${NC}"
+                    git clone "$REPO_URL"
 
-                # Navigate to the project directory
-                cd "$PROJECT_DIR" || exit
+                    # Navigate to the project directory
+                    cd "$PROJECT_DIR" || exit
 
-                # Display storage options
-                echo -e "${BLUE}Choose a storage option:${NC}"
-                echo
-                echo -e "${YELLOW}1) Redis${NC}"
-                echo -e "${GREEN}   - Pros: Fast in-memory storage, supports complex data types, great for caching, and pub/sub messaging.${NC}"
-                echo -e "${RED}   - Cons: Data is lost if not persisted, requires Redis server management.${NC}"
-                echo
-                echo -e "${YELLOW}2) SQLite${NC}"
-                echo -e "${GREEN}   - Pros: Lightweight, serverless, easy to set up, and file-based storage.${NC}"
-                echo -e "${RED}   - Cons: Not suitable for high-concurrency writes, limited scalability compared to other SQL databases.${NC}"
-                echo
-                echo -e "${YELLOW}3) JSON${NC}"
-                echo -e "${GREEN}   - Pros: Simple and human-readable format, easy to set up without dependencies, good for small-scale applications.${NC}"
-                echo -e "${RED}   - Cons: Poor scalability, not ideal for concurrent access, and lacks advanced querying capabilities.${NC}"
-                echo
-                read -p "Enter option (1-3): " storage_option
+                    # Display storage options
+                    echo -e "${BLUE}Choose a storage option:${NC}"
+                    echo
+                    echo -e "${YELLOW}1) Redis${NC}"
+                    echo -e "${GREEN}   - Pros: Fast in-memory storage, supports complex data types, great for caching, and pub/sub messaging.${NC}"
+                    echo -e "${RED}   - Cons: Data is lost if not persisted, requires Redis server management.${NC}"
+                    echo
+                    echo -e "${YELLOW}2) SQLite${NC}"
+                    echo -e "${GREEN}   - Pros: Lightweight, serverless, easy to set up, and file-based storage.${NC}"
+                    echo -e "${RED}   - Cons: Not suitable for high-concurrency writes, limited scalability compared to other SQL databases.${NC}"
+                    echo
+                    echo -e "${YELLOW}3) JSON${NC}"
+                    echo -e "${GREEN}   - Pros: Simple and human-readable format, easy to set up without dependencies, good for small-scale applications.${NC}"
+                    echo -e "${RED}   - Cons: Poor scalability, not ideal for concurrent access, and lacks advanced querying capabilities.${NC}"
+                    echo
+                    read -p "Enter option (1-3): " storage_option
 
-                # Validate storage option
-                case $storage_option in
-                    1) echo "STORAGE_TYPE=redis" > .env ;;
-                    2) echo "STORAGE_TYPE=sqlite" > .env ;;
-                    3) echo "STORAGE_TYPE=json" > .env ;;
-                    *) echo -e "${RED}Invalid option. Exiting.${NC}"; exit 1 ;;
-                esac
+                    # Validate storage option
+                    case $storage_option in
+                        1) echo "STORAGE_TYPE=redis" > .env ;;
+                        2) echo "STORAGE_TYPE=sqlite" > .env ;;
+                        3) echo "STORAGE_TYPE=json" > .env ;;
+                        *) echo -e "${RED}Invalid option. Exiting.${NC}"; exit 1 ;;
+                    esac
 
-                # Call the centralized environment variable configuration function
-                configure_env
+                    # Call the centralized environment variable configuration function
+                    configure_env
 
-                # Start Docker Compose
-                echo -e "${BLUE}Starting watchdog...${NC}"
-                docker-compose up --build || { echo -e "${RED}Failed to start Docker compose.${NC}"; exit 1; }
-                ;;
-            "Exit")
-                echo -e "${GREEN}Exiting...${NC}"
-                exit 0
-                ;;
-        esac
+                    # Start Docker Compose
+                    echo -e "${BLUE}Starting watchdog...${NC}"
+                    docker-compose up --build || { echo -e "${RED}Failed to start Docker compose.${NC}"; exit 1; }
+                    ;;
+                "Exit")
+                    echo -e "${GREEN}Exiting...${NC}"
+                    exit 0
+                    ;;
+            esac
+        fi
     fi
 done

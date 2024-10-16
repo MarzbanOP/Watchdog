@@ -3,24 +3,23 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 	"watchdog/models"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
-
 var (
-	ctx                = context.Background()
-	rdb                *redis.Client
-	mu                 sync.Mutex // Mutex for JSON file operations
-	userDeleteDelay, _ = strconv.Atoi(os.Getenv("USER_DELETE_DELAY")) // Read from .env
+	ctx = context.Background()
+	rdb *redis.Client
+	mu  sync.Mutex
+	db  *gorm.DB // Global database connection
 )
+
 // Initialize Redis client
 func InitRedis() {
 	rdb = redis.NewClient(&redis.Options{
@@ -35,293 +34,186 @@ func InitSQLite() (*gorm.DB, error) {
 	return nil, nil
 }
 
-// AddUserRedis - Handler to add user in Redis
-func AddUserRedis(c *fiber.Ctx) error {
-	var user models.User
-	if err := c.BodyParser(&user); err != nil {
-		return c.Status(400).SendString("Invalid input")
-	}
-
-	// Set user in Redis
-	if err := rdb.Set(ctx, user.Email, user.Limit, 0).Err(); err != nil {
-		return c.Status(500).SendString("Failed to add user to Redis")
-	}
-
-	// Schedule user deletion after USER_DELETE_DELAY seconds
-	go deleteUserAfterDuration(c,user.Email, "redis")
-
-	return c.Status(201).JSON(user)
-}
-
-// DeleteUserRedis - Handler to delete user in Redis
-
-func DeleteUserRedis(c *fiber.Ctx) error {
-	email := c.Params("email")
-
-	// Delete user from Redis
-	if err := rdb.Del(ctx, email).Err(); err != nil {
-		return c.Status(500).SendString("Failed to delete user from Redis")
-	}
-	return c.Status(204).SendString("")
-}
-
-// AddUserJSON - Handler to add user in JSON
-func AddUserJSON(c *fiber.Ctx) error {
-	var newUser models.User
-	if err := c.BodyParser(&newUser); err != nil {
-		return c.Status(400).SendString("Invalid input")
-	}
-
+// GetUserJSON function to retrieve a user by email from the JSON file
+func GetUserJSON(email string, user *models.User) error {
 	mu.Lock()
 	defer mu.Unlock()
 
 	// Read current users from users.json
 	data, err := os.ReadFile("storage/users.json")
 	if err != nil {
-		return c.Status(500).SendString("Failed to read users")
+		return fmt.Errorf("failed to read users: %w", err)
 	}
 
 	var users []models.User
 	if err := json.Unmarshal(data, &users); err != nil {
-		return c.Status(500).SendString("Failed to parse users JSON")
+		return fmt.Errorf("failed to parse users JSON: %w", err)
 	}
 
-	// Append new user
-	users = append(users, newUser)
-
-	// Write updated data back to file
-	updatedData, err := json.Marshal(users)
-	if err != nil {
-		return c.Status(500).SendString("Failed to marshal updated users")
+	// Search for the user by email
+	for _, u := range users {
+		if u.Email == email {
+			*user = u  // Copy the found user to the provided user pointer
+			return nil // Successfully found and returned the user
+		}
 	}
 
-	if err := os.WriteFile("storage/users.json", updatedData, 0644); err != nil {
-		return c.Status(500).SendString("Failed to write updated users")
-	}
-
-	// Schedule user deletion after USER_DELETE_DELAY seconds
-	go deleteUserAfterDuration(c,newUser.Email, "json")
-
-	return c.Status(201).JSON(newUser)
+	return fmt.Errorf("user with email %s not found", email) // User not found
 }
 
-// DeleteUserJSON - Handler to delete user in JSON
-func DeleteUserJSON(c *fiber.Ctx) error {
-	email := c.Params("email")
-
+// GetAllUserJSON retrieves all users from the JSON file
+func GetAllUserJSON() ([]models.User, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
 	// Read current users from users.json
 	data, err := os.ReadFile("storage/users.json")
 	if err != nil {
-		return c.Status(500).SendString("Failed to read users")
+		return nil, fmt.Errorf("failed to read users: %w", err)
 	}
 
 	var users []models.User
 	if err := json.Unmarshal(data, &users); err != nil {
-		return c.Status(500).SendString("Failed to parse users JSON")
+		return nil, fmt.Errorf("failed to parse users JSON: %w", err)
+	}
+	return users, nil
+}
+
+// AddUserRedis adds a user to Redis and manages their IPs
+func AddUserRedis(user *models.User, newIP string) error {
+	// Fetch existing user data from Redis
+	existingData, err := rdb.Get(ctx, user.Email).Result()
+	if err == redis.Nil {
+		// If the user does not exist, create a new one
+		user.ActiveIPs = []string{} // Initialize if creating new user
+	} else if err != nil {
+		return fmt.Errorf("failed to get user from Redis: %v", err)
+	} else {
+		// Unmarshal existing user data
+		if err := json.Unmarshal([]byte(existingData), user); err != nil {
+			return fmt.Errorf("failed to deserialize existing user: %v", err)
+		}
 	}
 
-	// Find and delete the user
+	// Check if the new IP is already in the ActiveIPs list
+	for _, ip := range user.ActiveIPs {
+		if ip == newIP {
+			fmt.Printf("IP %s already exists for user %s\n", newIP, user.Email)
+			return nil // Exit if the IP already exists
+		}
+	}
+
+	// Add the new IP to ActiveIPs
+	user.ActiveIPs = append(user.ActiveIPs, newIP)
+
+	// Serialize updated user struct to JSON
+	userData, err := json.Marshal(user)
+	if err != nil {
+		return fmt.Errorf("failed to serialize user: %v", err)
+	}
+
+	// Store serialized user data in Redis
+	if err := rdb.Set(ctx, user.Email, userData, 0).Err(); err != nil {
+		return fmt.Errorf("failed to add/update user in Redis: %v", err)
+	}
+
+	return nil
+}
+
+// AddUserJSON adds a user to the JSON file and manages their IPs
+func AddUserJSON(newUser *models.User, newIP string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Read current users from users.json
+	data, err := os.ReadFile("storage/users.json")
+	if err != nil {
+		return fmt.Errorf("failed to read users: %w", err)
+	}
+
+	var users []models.User
+	if err := json.Unmarshal(data, &users); err != nil {
+		return fmt.Errorf("failed to parse users JSON: %w", err)
+	}
+
+	// Check for existing user
 	for i, user := range users {
-		if user.Email == email {
-			users = append(users[:i], users[i+1:]...) // Remove user
+		if user.Email == newUser.Email {
+			fmt.Printf("User %s found, updating IPs...\n", user.Email)
+			// Check if the new IP is already in the ActiveIPs list
+			for _, ip := range user.ActiveIPs {
+				if ip == newIP {
+					fmt.Printf("IP %s already exists for user %s\n", newIP, newUser.Email)
+					return nil // Exit if the IP already exists
+				}
+			}
+			// Add the new IP to ActiveIPs
+			users[i].ActiveIPs = append(users[i].ActiveIPs, newIP)
+			// Update the updated_at timestamp
+			users[i].UpdatedAt = time.Now()
 			break
 		}
 	}
 
-	// Write updated data back to file
+	// If the user doesn't exist, create a new user
+	newUser.ActiveIPs = []string{newIP}
+	newUser.CreatedAt = time.Now() // Set the created_at timestamp
+	newUser.UpdatedAt = time.Now() // Set the updated_at timestamp
+	users = append(users, *newUser)
+
+	// Write updated users back to JSON file
 	updatedData, err := json.Marshal(users)
 	if err != nil {
-		return c.Status(500).SendString("Failed to marshal updated users")
+		return fmt.Errorf("failed to marshal updated users: %w", err)
 	}
 
 	if err := os.WriteFile("storage/users.json", updatedData, 0644); err != nil {
-		return c.Status(500).SendString("Failed to write updated users")
+		return fmt.Errorf("failed to write users to JSON: %w", err)
 	}
 
-	return c.Status(204).SendString("")
+	return nil
 }
 
-// AddUserSQLite - Handler to add user in SQLite
-func AddUserSQLite(c *fiber.Ctx, db *gorm.DB) error {
-	var newUser models.User
-	if err := c.BodyParser(&newUser); err != nil {
-		return c.Status(400).SendString("Invalid input")
-	}
-
-	if err := db.Create(&newUser).Error; err != nil {
-		return c.Status(500).SendString("Failed to add user to SQLite")
-	}
-
-	// Schedule user deletion after USER_DELETE_DELAY seconds
-	go deleteUserAfterDuration(c,newUser.Email, "sqlite")
-
-	return c.Status(201).JSON(newUser)
-}
-
-// DeleteUserSQLite - Handler to delete user in SQLite
-func DeleteUserSQLite(c *fiber.Ctx, db *gorm.DB) error {
-	email := c.Params("email")
-
-	if err := db.Where("email = ?", email).Delete(&models.User{}).Error; err != nil {
-		return c.Status(500).SendString("Failed to delete user from SQLite")
-	}
-
-	return c.Status(204).SendString("")
-}
-
-
-// deleteUserAfterDuration deletes the user after a specified duration
-func deleteUserAfterDuration(c *fiber.Ctx, email, storageType string) {
-	time.Sleep(time.Duration(userDeleteDelay) * time.Second)
-
-	// Call the appropriate delete function based on storage type
-	switch storageType {
-	case "redis":
-		_ = DeleteUserRedis(c) // Error ignored for simplicity
-
-	case "json":
-		_ = DeleteUserJSON(c) // Error ignored for simplicity
-
-	case "sqlite":
-		_ = DeleteUserSQLite(c, nil) // Ensure to pass a valid db instance
-	}
-}
-
-
-// BlockIPRedis - Handler to block an IP in Redis
-func BlockIPRedis(c *fiber.Ctx) error {
-	ip := c.Params("ip")
-	banTime := 5 // Ban time in minutes
-
-	// Set blocked IP in Redis
-	if err := rdb.Set(ctx, ip, banTime, 0).Err(); err != nil {
-		return c.Status(500).SendString("Failed to block IP")
-	}
-
-	return c.Status(200).SendString("IP blocked successfully")
-}
-
-// BlockIPJSON - Handler to block an IP in JSON
-func BlockIPJSON(c *fiber.Ctx) error {
-	ip := c.Params("ip")
-	banTime := 10 // Ban time in minutes
-
+// AddUserSQLite adds a user to SQLite and manages their IPs
+func AddUserSQLite(newUser *models.User, newIP string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	// Read existing blocked IPs from blocked_ips.json
-	data, err := os.ReadFile("storage/blocked_ips.json")
-	if err != nil {
-		return c.Status(500).SendString("Failed to read blocked IPs")
+	// Read current users from the database
+	var users []models.User
+	if err := db.Find(&users).Error; err != nil {
+		return fmt.Errorf("failed to read users from SQLite: %w", err)
 	}
 
-	var blockedIPs []models.BlockedIP
-	if err := json.Unmarshal(data, &blockedIPs); err != nil {
-		return c.Status(500).SendString("Failed to parse blocked IPs JSON")
-	}
-
-	// Add new IP to blocked list
-	newBlockedIP := models.BlockedIP{
-		IP:       ip,
-		BanTime:  banTime,
-		BannedAt: time.Now().Unix(),
-	}
-	blockedIPs = append(blockedIPs, newBlockedIP)
-
-	// Write updated data back to file
-	updatedData, err := json.Marshal(blockedIPs)
-	if err != nil {
-		return c.Status(500).SendString("Failed to marshal updated blocked IPs")
-	}
-
-	if err := os.WriteFile("storage/blocked_ips.json", updatedData, 0644); err != nil {
-		return c.Status(500).SendString("Failed to write updated blocked IPs")
-	}
-
-	return c.Status(200).SendString("IP blocked successfully")
-}
-
-// BlockIPSQLite - Handler to block an IP in SQLite
-func BlockIPSQLite(c *fiber.Ctx, db *gorm.DB) error {
-	ip := c.Params("ip")
-	banTime := 10 // Ban time in minutes
-
-	blockedIP := models.BlockedIP{
-		IP:       ip,
-		BanTime:  banTime,
-		BannedAt: time.Now().Unix(),
-	}
-
-	if err := db.Create(&blockedIP).Error; err != nil {
-		return c.Status(500).SendString("Failed to block IP")
-	}
-
-	return c.Status(200).SendString("IP blocked successfully")
-}
-
-// UnblockIPRedis - Handler to unblock an IP in Redis
-func UnblockIPRedis(c *fiber.Ctx) error {
-	ip := c.Params("ip")
-
-	// Delete IP from Redis
-	if err := rdb.Del(ctx, ip).Err(); err != nil {
-		return c.Status(500).SendString("Failed to unblock IP")
-	}
-
-	return c.Status(200).SendString("IP unblocked successfully")
-}
-
-// UnblockIPJSON - Handler to unblock an IP in JSON
-func UnblockIPJSON(c *fiber.Ctx) error {
-	ip := c.Params("ip")
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	// Read existing blocked IPs from blocked_ips.json
-	data, err := os.ReadFile("storage/blocked_ips.json")
-	if err != nil {
-		return c.Status(500).SendString("Failed to read blocked IPs")
-	}
-
-	var blockedIPs []models.BlockedIP
-	if err := json.Unmarshal(data, &blockedIPs); err != nil {
-		return c.Status(500).SendString("Failed to parse blocked IPs JSON")
-	}
-
-	// Find and delete the IP
-	for i, blockedIP := range blockedIPs {
-		if blockedIP.IP == ip {
-			blockedIPs = append(blockedIPs[:i], blockedIPs[i+1:]...) // Remove IP
+	// Check if the user already exists and update IPs
+	for i, user := range users {
+		if user.Email == newUser.Email {
+			// Check if the new IP is already in the ActiveIPs list
+			for _, ip := range user.ActiveIPs {
+				if ip == newIP {
+					fmt.Printf("IP %s already exists for user %s\n", newIP, newUser.Email)
+					return nil // Exit if the IP already exists
+				}
+			}
+			// Add the new IP to ActiveIPs
+			users[i].ActiveIPs = append(users[i].ActiveIPs, newIP)
+			// Update timestamps
+			users[i].UpdatedAt = time.Now()
+			// Update the user with new details
+			if err := db.Save(&users[i]).Error; err != nil {
+				return fmt.Errorf("failed to update user in SQLite: %w", err)
+			}
 			break
 		}
 	}
 
-	// Write updated data back to file
-	updatedData, err := json.Marshal(blockedIPs)
-	if err != nil {
-		return c.Status(500).SendString("Failed to marshal updated blocked IPs")
+	// If the user doesn't exist, create a new user with the new IP
+	newUser.ActiveIPs = []string{newIP}
+	newUser.CreatedAt = time.Now()
+	newUser.UpdatedAt = time.Now()
+	if err := db.Create(newUser).Error; err != nil {
+		return fmt.Errorf("failed to add user to SQLite: %w", err)
 	}
 
-	if err := os.WriteFile("storage/blocked_ips.json", updatedData, 0644); err != nil {
-		return c.Status(500).SendString("Failed to write updated blocked IPs")
-	}
-
-	return c.Status(200).SendString("IP unblocked successfully")
+	return nil
 }
-
-// UnblockIPSQLite - Handler to unblock an IP in SQLite
-func UnblockIPSQLite(c *fiber.Ctx, db *gorm.DB) error {
-	ip := c.Params("ip")
-
-	if err := db.Where("ip = ?", ip).Delete(&models.BlockedIP{}).Error; err != nil {
-		return c.Status(500).SendString("Failed to unblock IP")
-	}
-
-	return c.Status(200).SendString("IP unblocked successfully")
-}
-
-

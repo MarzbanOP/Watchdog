@@ -1,16 +1,17 @@
 package main
 
 import (
-    "encoding/json"
-    "fmt"
-    "log"
-    "net/http"
-    "net/url"
-    "regexp"
-    "os"
-    "time"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"regexp"
+	"time"
 
-    "github.com/gorilla/websocket"
+	"github.com/gorilla/websocket"
 )
 
 // Structure for the token response
@@ -21,7 +22,7 @@ type TokenResponse struct {
 // Function to get the token by sending admin credentials
 func getToken() (string, error) {
     // API URL for token authentication
-    tokenURL := "http://5.75.200.248:8000/api/admin/token"
+    tokenURL := "http://37.152.189.61:8000/api/admin/token"
 
     // Prepare the data for the form
     data := url.Values{}
@@ -57,7 +58,7 @@ func getToken() (string, error) {
 func connectToWebSocket(token string) {
     // WebSocket server details
     ssl := os.Getenv("SSL") == "false"  // Check if SSL is enabled
-    url := "5.75.200.248:8000"          // Replace with the appropriate server URL
+    url := "37.152.189.61:8000"          // Replace with the appropriate server URL
     interval := "1"                     // Set your desired interval
 
     // Construct the WebSocket URL
@@ -97,36 +98,66 @@ func connectToWebSocket(token string) {
     }
 }
 
-// logParsedMessage prints the extracted IP address and email from the message
+// logParsedMessage sends extracted IP and email to the /api/user/add endpoint
 func logParsedMessage(message string) {
-    // Parse the message for IP and email
     ip, email := parseMessage(message)
-    if ip != "" && email != "" { // Only log if both IP and email are found
-        fmt.Printf("IP: %s, Email: %s\n", ip, email)
+    if ip != "" && email != "" {
+        sendToAPICallback(ip, email)
     }
 }
 
-// parseMessage extracts the IP address and email from the message using regex
+// parseMessage extracts IP and email using regex
 func parseMessage(message string) (string, string) {
-    // Regular expression to capture the IP address (before the colon) and the email (after 'email:')
     ipRegex := regexp.MustCompile(`([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)`)
     emailRegex := regexp.MustCompile(`email:\s*([^\s]+)`)
 
-    // Extract IP address
     ipMatch := ipRegex.FindStringSubmatch(message)
-    if len(ipMatch) < 2 {
-        return "", "" // No IP found
-    }
-    ip := ipMatch[1]
-
-    // Extract email
     emailMatch := emailRegex.FindStringSubmatch(message)
-    if len(emailMatch) < 2 {
-        return "", "" // No email found
-    }
-    email := emailMatch[1]
 
-    return ip, email
+    if len(ipMatch) < 2 || len(emailMatch) < 2 {
+        return "", ""
+    }
+
+    return ipMatch[1], emailMatch[1]
+}
+
+// sendToAPICallback sends the extracted data, LIMIT, email, and ActiveIPs to the /api/user/add endpoint at port 4000
+func sendToAPICallback(ip, email string) {
+    limit := os.Getenv("MAX_ALLOW_USERS")
+
+    apiURL := "http://localhost:4000/api/user/add" // API endpoint
+    data := map[string]interface{}{
+        "ip":        ip,
+        "email":     email,
+        "limit":     limit,
+    }
+
+    jsonData, err := json.Marshal(data)
+    if err != nil {
+        log.Printf("Error marshalling JSON: %v", err)
+        return
+    }
+
+    req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
+    if err != nil {
+        log.Printf("Error creating HTTP request: %v", err)
+        return
+    }
+
+    req.Header.Set("Content-Type", "application/json")
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        log.Printf("Error sending HTTP request: %v", err)
+        return
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        log.Printf("API callback failed: %v", resp.Status)
+    } else {
+        log.Println("Data successfully sent to /api/user/add.")
+    }
 }
 
 func main() {
